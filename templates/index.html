@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar STAER - Tempo Real</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; } 
+        .info-box {
+            position: absolute; top: 10px; right: 10px; z-index: 1000;
+            background: white; padding: 10px; border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2); font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="info-box">
+        <h3>Radar STAER</h3>
+        <div id="status">A carregar...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        var map = L.map('map').setView([41.2, -8.6], 9);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var markers = {}; 
+
+        async function atualizarMapa() {
+            try {
+                const response = await fetch('/api/aeronaves');
+                const avioes = await response.json();
+                
+                document.getElementById('status').innerText = `Aviões visíveis: ${avioes.length}`;
+
+                for (var id in markers) {
+                    map.removeLayer(markers[id]);
+                }
+                markers = {};
+
+                avioes.forEach(aviao => {
+                    if (aviao.lat && aviao.lon) {
+                        
+                        let info = `<b>Voo:</b> ${aviao.flight || 'N/A'}<br>
+                                    <b>Alt:</b> ${aviao.altitude} ft<br>
+                                    <b>Vel:</b> ${aviao.speed} kt`;
+
+                        let marker = L.marker([aviao.lat, aviao.lon])
+                            .bindPopup(info)
+                            .addTo(map);
+                        
+                        markers[aviao.hex] = marker;
+                    }
+                });
+
+            } catch (error) {
+                console.error('Erro ao buscar dados:', error);
+                document.getElementById('status').innerText = "Erro na ligação!";
+            }
+        }
+
+        atualizarMapa(); 
+        setInterval(atualizarMapa, 5000); 
+
+    </script>
+</body>
+</html>

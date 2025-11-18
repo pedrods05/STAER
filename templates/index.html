@@ -3,25 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radar STAER - Tempo Real</title>
+    <title>Radar STAER - Fase 2</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        body { margin: 0; padding: 0; }
-        #map { height: 100vh; width: 100%; } 
-        .info-box {
-            position: absolute; top: 10px; right: 10px; z-index: 1000;
-            background: white; padding: 10px; border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2); font-family: sans-serif;
+        /* Forçar o site a ocupar o ecrã todo */
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Remove barras de scroll */
+            font-family: Arial, sans-serif;
         }
+
+        /* O Mapa fica no fundo a ocupar 100% */
+        #map {
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1; /* Camada 1 (Fundo) */
+        }
+
+        /* A caixa branca flutua por cima */
+        .info-box {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 9999; /* Camada 9999 (Topo) */
+            
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            width: 250px;
+        }
+
+        h3 { margin-top: 0; color: #333; }
+        .status-text { margin-bottom: 10px; font-size: 0.9rem; }
+        .slider-container { margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px; }
     </style>
 </head>
 <body>
 
     <div class="info-box">
         <h3>Radar STAER</h3>
-        <div id="status">A carregar...</div>
+        <div id="status" class="status-text">A carregar dados...</div>
+        
+        <div class="slider-container">
+            <label for="filtroAlt"><b>Altitude Mínima:</b> <span id="valorAlt">0</span> ft</label>
+            <br>
+            <input type="range" id="filtroAlt" min="0" max="40000" step="1000" value="0" style="width: 100%" oninput="atualizarValor(this.value)">
+        </div>
     </div>
 
     <div id="map"></div>
@@ -29,7 +65,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        var map = L.map('map').setView([41.2, -8.6], 9);
+        // 1. Iniciar o mapa (Centrado no Porto)
+        var map = L.map('map').setView([41.15, -8.62], 9);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
@@ -37,42 +74,58 @@
 
         var markers = {}; 
 
+        // Atualiza o texto da barra de deslize instantaneamente
+        function atualizarValor(val) {
+            document.getElementById('valorAlt').innerText = val;
+            atualizarMapa();
+        }
+
+        // Função principal
         async function atualizarMapa() {
             try {
-                const response = await fetch('/api/aeronaves');
-                const avioes = await response.json();
-                
-                document.getElementById('status').innerText = `Aviões visíveis: ${avioes.length}`;
+                // Ler valor do filtro
+                let altMin = document.getElementById('filtroAlt').value;
 
-                for (var id in markers) {
+                // Pedir dados à API
+                const response = await fetch(`/api/aeronaves?min_alt=${altMin}`);
+                const avioes = await response.json();
+
+                // Contar aviões no mapa
+                let noMapa = 0;
+                
+                // Limpar marcadores antigos
+                for (let id in markers) {
                     map.removeLayer(markers[id]);
                 }
                 markers = {};
 
+                // Adicionar novos marcadores
                 avioes.forEach(aviao => {
                     if (aviao.lat && aviao.lon) {
+                        noMapa++;
                         
                         let info = `<b>Voo:</b> ${aviao.flight || 'N/A'}<br>
                                     <b>Alt:</b> ${aviao.altitude} ft<br>
                                     <b>Vel:</b> ${aviao.speed} kt`;
 
-                        let marker = L.marker([aviao.lat, aviao.lon])
-                            .bindPopup(info)
-                            .addTo(map);
-                        
-                        markers[aviao.hex] = marker;
+                        let m = L.marker([aviao.lat, aviao.lon]).bindPopup(info).addTo(map);
+                        markers[aviao.hex] = m;
                     }
                 });
 
-            } catch (error) {
-                console.error('Erro ao buscar dados:', error);
-                document.getElementById('status').innerText = "Erro na ligação!";
+                // Atualizar texto de status
+                document.getElementById('status').innerHTML = 
+                    `Detetados: <b>${avioes.length}</b> | No Mapa: <b>${noMapa}</b>`;
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('status').innerText = "Erro de Ligação!";
             }
         }
 
-        atualizarMapa(); 
-        setInterval(atualizarMapa, 5000); 
-
+        // Atualizar a cada 2 segundos
+        setInterval(atualizarMapa, 2000);
+        atualizarMapa(); // Primeira execução
     </script>
 </body>
 </html>

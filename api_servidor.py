@@ -1,5 +1,5 @@
 import sqlite3
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 DB_FILE = "trafego_aereo.db"
 
@@ -18,11 +18,11 @@ def index():
 def get_aeronaves():
    
     try:
+        min_alt = request.args.get('min_alt', default=0, type=int)
         conn = get_db_connection()
         cursor = conn.cursor()
-
-        cursor.execute("SELECT * FROM aeronaves")
-
+        query = "SELECT * FROM aeronaves WHERE altitude >= ? AND altitude IS NOT NULL"
+        cursor.execute(query, (min_alt,))
         lista_avioes = [dict(row) for row in cursor.fetchall()]
 
         conn.close()

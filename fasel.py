@@ -3,13 +3,9 @@ import json
 import sqlite3
 import time
 
-# --- Configuração ---
-# URL ATUALIZADO de acordo com a tua informação
 URL_DUMP1090 = "https://ads-b.jcboliveira.xyz/dump1090/data/aircraft.json"
 DB_FILE = "trafego_aereo.db"
-INTERVALO_SEGUNDOS = 30 # Podes ajustar. 10-30 segundos é razoável.
-
-# --- Funções da Base de Dados ---
+INTERVALO_SEGUNDOS = 30 
 def inicializar_db():
     conexao = sqlite3.connect(DB_FILE)
     cursor = conexao.cursor()
@@ -42,10 +38,9 @@ def guardar_dados_db(lista_aeronaves, timestamp_recolha):
     registos_para_inserir = []
     
     for aviao in lista_aeronaves:
-        # Usamos .get(key) para evitar erros se uma chave não existir
         registo = (
             aviao.get('hex'),
-            aviao.get('flight', '').strip(), # Limpa espaços extra
+            aviao.get('flight', '').strip(), 
             aviao.get('altitude'),
             aviao.get('speed'),
             aviao.get('lat'),
@@ -74,19 +69,15 @@ def guardar_dados_db(lista_aeronaves, timestamp_recolha):
     finally:
         conexao.close()
 
-# --- Função de Recolha ---
 def buscar_dados_aeronaves():
     print(f"A contactar {URL_DUMP1090}...")
     try:
-        # Adiciona um User-Agent para parecer um browser normal
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
         }
         
-        # Aumentei o timeout para 10s caso a ligação seja lenta
         resposta = requests.get(URL_DUMP1090, headers=headers, timeout=10)
         
-        # Verifica se o pedido foi bem-sucedido (código 200)
         resposta.raise_for_status() 
         
         dados = resposta.json()
@@ -100,8 +91,23 @@ def buscar_dados_aeronaves():
     except requests.exceptions.RequestException as e:
         print(f"Erro ao contactar o dump1090: {e}")
         return None, None
-
-# --- Loop Principal ---
+def limpar_dados_antigos(tempo_atual):
+    """
+    Remove aviões que não foram atualizados há mais de 2 minutos (120s).
+    Isto evita 'aviões fantasma' no mapa.
+    """
+    conexao = sqlite3.connect(DB_FILE)
+    cursor = conexao.cursor()
+    
+    limite = tempo_atual - 120 
+    cursor.execute("DELETE FROM aeronaves WHERE timestamp_recolha < ?", (limite,))
+    
+    apagados = cursor.rowcount
+    if apagados > 0:
+        print(f"Limpeza: {apagados} aviões antigos removidos da base de dados.")
+    
+    conexao.commit()
+    conexao.close()
 def main():
     inicializar_db()
     
@@ -112,7 +118,7 @@ def main():
         
         if aeronaves is not None:
             guardar_dados_db(aeronaves, tempo)
-            
+            limpar_dados_antigos(tempo)
         print(f"A aguardar {INTERVALO_SEGUNDOS} segundos...")
         time.sleep(INTERVALO_SEGUNDOS)
 

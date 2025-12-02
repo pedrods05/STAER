@@ -3,60 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radar STAER - Fase 2</title>
+    <title>Radar STAER - Fase 2 (Final)</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        /* Forçar o site a ocupar o ecrã todo */
         html, body {
-            height: 100%;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Remove barras de scroll */
-            font-family: Arial, sans-serif;
+            height: 100%; width: 100%; margin: 0; padding: 0;
+            overflow: hidden; font-family: Arial, sans-serif;
         }
 
-        /* O Mapa fica no fundo a ocupar 100% */
         #map {
-            height: 100%;
-            width: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 1; /* Camada 1 (Fundo) */
+            position: absolute; top: 0; bottom: 0; left: 0; right: 0;
+            height: 100%; width: 100%; z-index: 1;
+            background-color: #aadaff; 
         }
 
-        /* A caixa branca flutua por cima */
         .info-box {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 9999; /* Camada 9999 (Topo) */
-            
+            position: absolute; top: 20px; right: 20px; z-index: 9999;
             background-color: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
-            width: 250px;
+            padding: 15px; border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3); width: 250px;
         }
 
-        h3 { margin-top: 0; color: #333; }
-        .status-text { margin-bottom: 10px; font-size: 0.9rem; }
+        h3 { margin-top: 0; color: #333; margin-bottom: 5px; }
         .slider-container { margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        
+        .flag-icon {
+            height: 20px; border-radius: 3px;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+            margin-left: 10px; vertical-align: middle;
+        }
+
+        .aviao-icon {
+            transition: all 0.5s linear; 
+        }
     </style>
 </head>
 <body>
 
     <div class="info-box">
         <h3>Radar STAER</h3>
-        <div id="status" class="status-text">A carregar dados...</div>
+        <div id="status">A ligar ao servidor...</div>
         
         <div class="slider-container">
-            <label for="filtroAlt"><b>Altitude Mínima:</b> <span id="valorAlt">0</span> ft</label>
-            <br>
-            <input type="range" id="filtroAlt" min="0" max="40000" step="1000" value="0" style="width: 100%" oninput="atualizarValor(this.value)">
+            <label><b>Altitude Mínima:</b> <span id="valorAlt">0</span> ft</label>
+            <input type="range" id="filtroAlt" min="0" max="40000" step="1000" value="0" oninput="atualizarValor(this.value)">
+        </div>
+        
+        <div style="margin-top: 10px; font-size: 0.8em; color: #666;">
+            <i>Ícones rodam com o rumo (track)</i>
         </div>
     </div>
 
@@ -65,7 +62,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // 1. Iniciar o mapa (Centrado no Porto)
         var map = L.map('map').setView([41.15, -8.62], 9);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -74,58 +70,129 @@
 
         var markers = {}; 
 
-        // Atualiza o texto da barra de deslize instantaneamente
+        function criarIconeAviao(rumo, cor = "#d63031") {
+            const svgAviao = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="30" 
+                     style="transform: rotate(${rumo}deg); filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));">
+                    <path fill="${cor}" stroke="white" stroke-width="1" 
+                          d="M21,16v-2l-8-5V3.5c0-0.83-0.67-1.5-1.5-1.5S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2,1.5V22l3.5-1l3.5,1v-1.5L13,19v-5.5L21,16z"/>
+                </svg>`;
+
+            return L.divIcon({
+                html: svgAviao,
+                className: 'aviao-icon', 
+                iconSize: [30, 30],
+                iconAnchor: [15, 15], 
+                popupAnchor: [0, -15]
+            });
+        }
+
+        function obterBandeira(hex) {
+            if (!hex) return '';
+            let h = hex.toUpperCase();
+            let pais = null;
+
+            if (h.startsWith('49')) pais = 'pt';
+            else if (h.startsWith('34')) pais = 'es';
+            else if (h.startsWith('38') || h.startsWith('39') || h.startsWith('3A')) pais = 'fr';
+            else if (h.startsWith('3C') || h.startsWith('3D')) pais = 'de';
+            else if (h.startsWith('40') || h.startsWith('41') || h.startsWith('42')) pais = 'gb';
+            else if (h.startsWith('4C')) pais = 'ie';
+            else if (h.startsWith('48')) pais = 'nl';
+            else if (h.startsWith('47')) pais = 'no';
+            else if (h.startsWith('45')) pais = 'dk';
+            else if (h.startsWith('46')) pais = 'se';
+            else if (h.startsWith('0D') || h.startsWith('00')) pais = 'za';
+            else if (h.startsWith('E4')) pais = 'br';
+            else if (h.startsWith('A')) pais = 'us';
+            else if (h.startsWith('896')) pais = 'ae';
+            else if (h.startsWith('4B')) pais = 'ch'; 
+            
+            if (pais) return `<img src="https://flagcdn.com/20x15/${pais}.png" class="flag-icon" title="${pais}">`;
+            return '';
+        }
+
         function atualizarValor(val) {
             document.getElementById('valorAlt').innerText = val;
             atualizarMapa();
         }
 
-        // Função principal
         async function atualizarMapa() {
             try {
-                // Ler valor do filtro
                 let altMin = document.getElementById('filtroAlt').value;
 
-                // Pedir dados à API
                 const response = await fetch(`/api/aeronaves?min_alt=${altMin}`);
+                if (!response.ok) throw new Error("Erro na API");
                 const avioes = await response.json();
 
-                // Contar aviões no mapa
+                let hexesNestaAtualizacao = new Set();
                 let noMapa = 0;
-                
-                // Limpar marcadores antigos
-                for (let id in markers) {
-                    map.removeLayer(markers[id]);
-                }
-                markers = {};
 
-                // Adicionar novos marcadores
                 avioes.forEach(aviao => {
                     if (aviao.lat && aviao.lon) {
                         noMapa++;
-                        
-                        let info = `<b>Voo:</b> ${aviao.flight || 'N/A'}<br>
-                                    <b>Alt:</b> ${aviao.altitude} ft<br>
-                                    <b>Vel:</b> ${aviao.speed} kt`;
+                        hexesNestaAtualizacao.add(aviao.hex);
 
-                        let m = L.marker([aviao.lat, aviao.lon]).bindPopup(info).addTo(map);
-                        markers[aviao.hex] = m;
+                        let bandeiraHTML = obterBandeira(aviao.hex);
+                        let rumo = aviao.track || 0; 
+
+                        let info = `
+                            <div style="font-family: Arial, sans-serif; min-width: 220px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <div style="display: flex; align-items: center;">
+                                        <h2 style="margin:0; color:#0056b3; font-size: 1.3em;">
+                                            ${aviao.flight || 'N/A'}
+                                        </h2>
+                                        ${bandeiraHTML}
+                                    </div>
+                                    <span style="background:#eee; padding: 2px 5px; border-radius: 4px; font-size: 0.8em; font-family: monospace;">
+                                        ${aviao.hex}
+                                    </span>
+                                </div>
+                                
+                                <table style="width: 100%; font-size: 0.9em; color: #333; border-top: 1px solid #eee; padding-top:5px;">
+                                    <tr><td><b>Alt:</b></td><td style="text-align: right;">${aviao.altitude} ft</td></tr>
+                                    <tr><td><b>Vel:</b></td><td style="text-align: right;">${aviao.speed} kt</td></tr>
+                                    <tr><td><b>Rumo:</b></td><td style="text-align: right;">${aviao.track}°</td></tr>
+                                    <tr><td><b>Squawk:</b></td><td style="text-align: right;">${aviao.squawk || 'N/A'}</td></tr>
+                                    <tr><td><b>Lat/Lon:</b></td><td style="text-align: right;">${aviao.lat.toFixed(3)}, ${aviao.lon.toFixed(3)}</td></tr>
+                                </table>
+                            </div>
+                        `;
+
+                        let novoIcone = criarIconeAviao(rumo);
+
+                        if (markers[aviao.hex]) {
+                            markers[aviao.hex].setLatLng([aviao.lat, aviao.lon]);
+                            markers[aviao.hex].setIcon(novoIcone);
+                            markers[aviao.hex].setPopupContent(info);
+                        } else {
+                            let m = L.marker([aviao.lat, aviao.lon], {icon: novoIcone})
+                                     .bindPopup(info)
+                                     .addTo(map);
+                            markers[aviao.hex] = m;
+                        }
                     }
                 });
 
-                // Atualizar texto de status
+                for (let hexExistente in markers) {
+                    if (!hexesNestaAtualizacao.has(hexExistente)) {
+                        map.removeLayer(markers[hexExistente]);
+                        delete markers[hexExistente];
+                    }
+                }
+
                 document.getElementById('status').innerHTML = 
                     `Detetados: <b>${avioes.length}</b> | No Mapa: <b>${noMapa}</b>`;
 
             } catch (e) {
-                console.error(e);
-                document.getElementById('status').innerText = "Erro de Ligação!";
+                console.error("Erro no JS:", e);
             }
         }
 
-        // Atualizar a cada 2 segundos
-        setInterval(atualizarMapa, 2000);
-        atualizarMapa(); // Primeira execução
+        setInterval(atualizarMapa, 1000);
+        atualizarMapa();
+
     </script>
 </body>
 </html>

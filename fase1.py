@@ -2,14 +2,12 @@ import requests
 import json
 import sqlite3
 import time
+import os
 
-# --- Configuração ---
-# URL ATUALIZADO de acordo com a tua informação
 URL_DUMP1090 = "https://ads-b.jcboliveira.xyz/dump1090/data/aircraft.json"
 DB_FILE = "trafego_aereo.db"
-INTERVALO_SEGUNDOS = 30 # Podes ajustar. 10-30 segundos é razoável.
+INTERVALO_SEGUNDOS = 20
 
-# --- Funções da Base de Dados ---
 def inicializar_db():
     conexao = sqlite3.connect(DB_FILE)
     cursor = conexao.cursor()
@@ -42,10 +40,9 @@ def guardar_dados_db(lista_aeronaves, timestamp_recolha):
     registos_para_inserir = []
     
     for aviao in lista_aeronaves:
-        # Usamos .get(key) para evitar erros se uma chave não existir
         registo = (
             aviao.get('hex'),
-            aviao.get('flight', '').strip(), # Limpa espaços extra
+            aviao.get('flight', '').strip(), 
             aviao.get('altitude'),
             aviao.get('speed'),
             aviao.get('lat'),
@@ -74,31 +71,50 @@ def guardar_dados_db(lista_aeronaves, timestamp_recolha):
     finally:
         conexao.close()
 
-# --- Função de Recolha ---
 def buscar_dados_aeronaves():
     print(f"A contactar {URL_DUMP1090}...")
+    
     try:
-        # Adiciona um User-Agent para parecer um browser normal
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0'
         }
-        
-        # Aumentei o timeout para 10s caso a ligação seja lenta
-        resposta = requests.get(URL_DUMP1090, headers=headers, timeout=10)
-        
-        # Verifica se o pedido foi bem-sucedido (código 200)
+        resposta = requests.get(URL_DUMP1090, headers=headers, timeout=5)
         resposta.raise_for_status() 
         
         dados = resposta.json()
-        
         lista_aeronaves = dados.get('aircraft', [])
-        tempo_agora = dados.get('now', 0)
+        tempo_agora = dados.get('now', time.time())
         
-        print(f"Recolhidos {len(lista_aeronaves)} aviões às {tempo_agora}")
+        print(f"✅ Online: Recolhidos {len(lista_aeronaves)} aviões.")
+        
+        try:
+            with open("aircraft.json", "w") as f:
+                json.dump(dados, f)
+        except:
+            pass 
+            
         return lista_aeronaves, tempo_agora
 
     except requests.exceptions.RequestException as e:
-        print(f"Erro ao contactar o dump1090: {e}")
+        print(f"⚠️ ERRO ONLINE: {e}")
+        print("📂 A ativar MODO DE EMERGÊNCIA (Ler aircraft.json local)...")
+        
+        if os.path.exists("aircraft.json"):
+            try:
+                with open("aircraft.json", "r") as f:
+                    dados = json.load(f)
+                
+                lista_aeronaves = dados.get('aircraft', [])
+                tempo_simulado = time.time() 
+                
+                print(f"✅ Backup Local: Carregados {len(lista_aeronaves)} aviões.")
+                return lista_aeronaves, tempo_simulado
+                
+            except Exception as e_local:
+                print(f"❌ Erro fatal: O backup local também falhou: {e_local}")
+        else:
+            print("❌ Erro: Ficheiro 'aircraft.json' não existe na pasta.")
+        
         return None, None
 def limpar_dados_antigos(tempo_atual):
     """
@@ -108,7 +124,6 @@ def limpar_dados_antigos(tempo_atual):
     conexao = sqlite3.connect(DB_FILE)
     cursor = conexao.cursor()
     
-    # Apaga registos onde o timestamp é muito antigo
     limite = tempo_atual - 120 
     cursor.execute("DELETE FROM aeronaves WHERE timestamp_recolha < ?", (limite,))
     
@@ -118,7 +133,6 @@ def limpar_dados_antigos(tempo_atual):
     
     conexao.commit()
     conexao.close()
-# --- Loop Principal ---
 def main():
     inicializar_db()
     

@@ -33,3 +33,17 @@ input[type=range] { width: 100%; cursor: pointer; }
 .aviao-icon {
     transition: all 0.5s linear; /* Movimento suave */
 }
+.search-container {
+    margin-top: 15px;
+    border-top: 1px solid #ddd;
+    padding-top: 10px;
+}
+
+input[type=text] {
+    width: 90%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-top: 5px;
+    font-size: 14px;
+}

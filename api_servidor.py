@@ -1,10 +1,7 @@
 import sqlite3
 from flask import Flask, jsonify, render_template, request
 
-# O nome da base de dados que o 'fase1.py' está a preencher
 DB_FILE = "trafego_aereo.db"
-
-# Cria a aplicação web Flask
 app = Flask(__name__, template_folder='templates')
 
 def get_db_connection():
@@ -27,6 +24,20 @@ def get_aeronaves():
         lista_avioes = [dict(row) for row in cursor.fetchall()]
         conn.close()
         return jsonify(lista_avioes)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/rasto/<hex_code>')
+def get_rasto(hex_code):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = "SELECT lat, lon FROM historico WHERE hex = ? ORDER BY timestamp_recolha ASC"
+        cursor.execute(query, (hex_code,))
+        
+        rasto = [[row['lat'], row['lon']] for row in cursor.fetchall()]
+        conn.close()
+        return jsonify(rasto)
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 

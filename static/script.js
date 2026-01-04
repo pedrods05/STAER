@@ -46,6 +46,16 @@ function criarIconeAviao(rumo, cor = "#d63031") {
             <path fill="${cor}" stroke="white" stroke-width="1" d="M21,16v-2l-8-5V3.5c0-0.83-0.67-1.5-1.5-1.5S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2,1.5V22l3.5-1l3.5,1v-1.5L13,19v-5.5L21,16z"/></svg>`;
     return L.divIcon({ html: svg, className: 'aviao-icon', iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -15] });
 }
+function atualizarValor(valor) {
+    document.getElementById("valorAlt").innerText = valor;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    let slider = document.getElementById("filtroAlt");
+    if (slider) {
+        atualizarValor(slider.value);
+    }
+});
 
 async function carregarRastoHistorico(hex) {
     try {

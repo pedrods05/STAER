@@ -86,7 +86,6 @@ async function atualizarMapa() {
         let hexesNestaAtualizacao = new Set();
         let noMapa = 0;
         let isDark = document.querySelector('.info-box').style.color === "white";
-        let corRastoAtual = isDark ? '#f1c40f' : '#3498db';
 
         avioes.forEach(aviao => {
             let voo = (aviao.flight || '').toUpperCase();
@@ -99,16 +98,31 @@ async function atualizarMapa() {
                 let bandeiraHTML = obterBandeira(aviao.hex);
                 
                 let info = `
-                    <div style="font-family: Arial, sans-serif; min-width: 120px;">
+                    <div style="font-family: Arial, sans-serif; min-width: 150px;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <b style="font-size:1.1em">${aviao.flight || 'N/A'}</b> ${bandeiraHTML}
+                            <b style="font-size:1.1em; color:#0078d7;">${aviao.flight || 'N/A'}</b> 
+                            ${bandeiraHTML}
                         </div>
                         <span style="font-size:0.8em; color:#888">${aviao.hex}</span>
+                        
                         <hr style="margin:5px 0; border: 0; border-top: 1px solid #ddd;">
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.9em;">
-                            <span>✈️ Alt:</span> <b>${aviao.altitude} ft</b>
-                            <span>🚀 Vel:</span> <b>${aviao.speed} kt</b>
-                            <span>📡 Sqk:</span> <b>${aviao.squawk || 'N/A'}</b>
+                        
+                        <div style="display:flex; flex-direction: column; gap: 4px; font-size: 0.9em;">
+                            
+                            <div style="display:flex; justify-content: space-between;">
+                                <span>✈️ Alt:</span>
+                                <span><b id="alt-${aviao.hex}">${aviao.altitude}</b> ft</span>
+                            </div>
+
+                            <div style="display:flex; justify-content: space-between;">
+                                <span>🚀 Vel:</span>
+                                <span><b id="vel-${aviao.hex}">${aviao.speed}</b> kt</span>
+                            </div>
+
+                            <div style="display:flex; justify-content: space-between;">
+                                <span>📡 Sqk:</span>
+                                <b>${aviao.squawk || 'N/A'}</b>
+                            </div>
                         </div>
                     </div>`;
 
@@ -117,8 +131,16 @@ async function atualizarMapa() {
                 if (markers[aviao.hex]) {
                     markers[aviao.hex].setLatLng([aviao.lat, aviao.lon]);
                     markers[aviao.hex].setIcon(novoIcone);
-                    if (!markers[aviao.hex].isPopupOpen()) markers[aviao.hex].setPopupContent(info);
                     
+                    if (!markers[aviao.hex].isPopupOpen()) {
+                        markers[aviao.hex].setPopupContent(info);
+                    }
+
+                    let elAlt = document.getElementById(`alt-${aviao.hex}`);
+                    let elVel = document.getElementById(`vel-${aviao.hex}`);
+                    
+                    if (elAlt) elAlt.innerText = aviao.altitude + " "; 
+
                     if (rastos[aviao.hex]) {
                         rastos[aviao.hex].addLatLng([aviao.lat, aviao.lon]);
                     }
